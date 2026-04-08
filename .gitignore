@@ -6,4 +6,6 @@ build/
 cache/
 fonts/
 output/
+output_*/
+experiments/
 .DS_Store
