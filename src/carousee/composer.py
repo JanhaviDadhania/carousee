@@ -25,10 +25,18 @@ def _default_dirs() -> tuple[Path, Path, Path, Path]:
 def collect_names(yaml_data: dict) -> list[str]:
     names = set()
     for slide in yaml_data.get("slides", []):
+        # new schema: group → people, person → name
         for p in slide.get("people", []):
             names.add(p["name"])
         if slide.get("name"):
             names.add(slide["name"])
+        # old schema: split → left/right, solo → character
+        for p in slide.get("left", []):
+            names.add(p["name"])
+        for p in slide.get("right", []):
+            names.add(p["name"])
+        if slide.get("character"):
+            names.add(slide["character"])
     return list(names)
 
 
