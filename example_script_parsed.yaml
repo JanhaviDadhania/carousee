@@ -1,0 +1,29 @@
+background: '#111111'
+slides:
+- id: 1
+  type: split
+  left:
+  - name: Michelson
+    quote: I've MEASURED the ether wind!
+  - name: Lorentz
+    quote: I have the equations for it.
+  - name: Miller
+    quote: I detected it from a mountaintop!
+  right: []
+- id: 2
+  type: solo
+  character: Einstein
+  quote: There is no ether.
+- id: 3
+  type: solo
+  character: Einstein
+  quote: Subtle is the Lord, mysterious he is not.
+- id: 4
+  type: text_card
+  body: 'Michelson believed in the ether until he died in 1931. In the late 1800s,
+    physicists believed that light waves needed a medium to travel through, just as
+    sound travels through air or ripples travel through water. They called this invisible
+    substance the luminiferous ether. Einstein wasn''t even sure he''d read the experiment.
+    Instead of trying to explain why the ether wind couldn''t be detected, Einstein
+    started with a radical assumption: The ether doesn''t exist. He proposed two simple
+    postulates that changed everything.'
