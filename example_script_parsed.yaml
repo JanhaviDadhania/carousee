@@ -13,12 +13,27 @@ slides:
 - id: 2
   type: solo
   character: Einstein
-  quote: There is no ether.
+  quote: nope.
 - id: 3
   type: solo
   character: Einstein
   quote: Subtle is the Lord, mysterious he is not.
 - id: 4
+  type: text_card
+  body: whole world believed in something which was not real. mythical.
+- id: 5
+  type: text_card
+  body: "whole world just kept believing in a mythical thing.\nno one said no to it\
+    \ until him..."
+- id: 6
+  type: text_card
+  body: "who cracked ether?\n[small]the youngest, least experienced\nwho wasn't even\
+    \ thinking about ether"
+- id: 7
+  type: text_card
+  body: "lesson? keep asking weird questions"
+  logo: true
+- id: 8
   type: text_card
   body: 'Michelson believed in the ether until he died in 1931. In the late 1800s,
     physicists believed that light waves needed a medium to travel through, just as
