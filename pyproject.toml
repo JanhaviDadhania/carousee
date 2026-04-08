@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "carousee"
+version = "0.1.0"
+description = "Generate Instagram/LinkedIn carousel slides from a plain text script"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+dependencies = [
+    "pillow>=10.0",
+    "rembg>=2.0.68",
+    "onnxruntime>=1.18.0",
+    "requests>=2.31",
+    "pyyaml>=6.0",
+    "anthropic>=0.25",
+]
+
+[project.scripts]
+carousee = "carousee.cli:main"
+
+[project.urls]
+Repository = "https://github.com/JanhaviDadhania/carousee"
+
+[tool.setuptools.packages.find]
+where = ["src"]
