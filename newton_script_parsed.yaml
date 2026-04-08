@@ -1,0 +1,21 @@
+slides:
+- id: 1
+  type: group
+  heading: Newton and Leibniz both claiming they invented calculus
+  people:
+  - name: Newton
+    quote: I invented calculus first. 1666.
+  - name: Leibniz
+    quote: I published it first. That's what counts.
+- id: 2
+  type: person
+  name: Newton
+  quote: Standing on the shoulders of giants.
+- id: 3
+  type: text
+  body: whole world uses calculus every day. nobody remembers the fight.
+- id: 4
+  type: text
+  body: 'lesson? publish early.
+
+    credit comes to those who ship.'
