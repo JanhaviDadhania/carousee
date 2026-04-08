@@ -17,13 +17,18 @@ Schema:
 slides:
   - id: <int>
     type: text | person | group
+
     # for type: text
     body: <str>           # supports \\n for hard line breaks, [small] tag for smaller text
 
     # for type: person
     name: <str>
     quote: <str>
-    heading: <str>        # optional heading above the photo
+    heading: <str>        # optional label above the photo
+    objects:              # optional list of prop/object images to place on the slide
+      - <str>             # object name (e.g. "apple", "telescope", "prism")
+    description: <str>   # optional spatial hint for the layout engine, e.g.
+                          # "apple falling on Newton's head from top-right"
 
     # for type: group
     heading: <str>
@@ -31,6 +36,9 @@ slides:
     people:
       - name: <str>
         quote: <str>
+    objects:              # optional — same as person
+      - <str>
+    description: <str>   # optional spatial hint
 
 Rules:
 - "text"   = no characters, just text (short punchy statement or longer body)
@@ -38,6 +46,8 @@ Rules:
 - "group"  = multiple characters side by side with a heading at top
 - Keep quotes verbatim from the script.
 - Infer slide type from context.
+- Infer objects from context (e.g. "apple falls on head" → objects: [apple]).
+- Write a description only when the script implies a specific spatial arrangement.
 """
 
 

@@ -11,6 +11,7 @@ import requests
 
 TIMEOUT = 15
 WIKIMEDIA_API = "https://en.wikipedia.org/w/api.php"
+COMMONS_API = "https://commons.wikimedia.org/w/api.php"
 HEADERS = {
     "User-Agent": "Carousee/0.1 (educational carousel generator; https://github.com/example) python-requests/2.31"
 }
@@ -57,6 +58,58 @@ def search_portrait(name: str) -> str | None:
     except Exception as e:
         print(f"  [fetch] Wikipedia search failed for '{name}': {e}")
         return None
+
+
+def search_object(name: str) -> str | None:
+    """Search Wikimedia Commons for an object image filename."""
+    params = {
+        "action": "query",
+        "list": "search",
+        "srsearch": name,
+        "srnamespace": 6,   # File namespace on Commons
+        "srlimit": 5,
+        "format": "json",
+    }
+    try:
+        resp = requests.get(COMMONS_API, params=params, timeout=TIMEOUT, headers=HEADERS)
+        resp.raise_for_status()
+        results = resp.json()["query"]["search"]
+        if not results:
+            return None
+        # Title looks like "File:Apple.jpg" — strip the prefix
+        return results[0]["title"].replace("File:", "")
+    except Exception as e:
+        print(f"  [fetch] Commons search failed for '{name}': {e}")
+        return None
+
+
+def download_object(name: str, cache_dir: Path, force: bool = False) -> Path:
+    """Download an object image from Wikimedia Commons."""
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    slug = "obj_" + _slug(name)
+
+    for ext in ("jpg", "jpeg", "png", "webp"):
+        cached = cache_dir / f"{slug}.{ext}"
+        if cached.exists() and not force:
+            print(f"  [fetch] Cache hit: {cached.name}")
+            return cached
+
+    print(f"  [fetch] Searching Commons for object '{name}'...")
+    filename = search_object(name)
+    if not filename:
+        raise FileNotFoundError(f"No image found on Wikimedia Commons for '{name}'")
+
+    url = _wikimedia_thumb_url(filename, width=600)
+    print(f"  [fetch] Downloading: {url}")
+    resp = requests.get(url, timeout=TIMEOUT, headers=HEADERS)
+    resp.raise_for_status()
+
+    content_type = resp.headers.get("content-type", "")
+    ext = "png" if "png" in content_type else "webp" if "webp" in content_type else "jpg"
+    out_path = cache_dir / f"{slug}.{ext}"
+    out_path.write_bytes(resp.content)
+    print(f"  [fetch] Saved: {out_path}")
+    return out_path
 
 
 def download_portrait(name: str, cache_dir: Path, force: bool = False) -> Path:

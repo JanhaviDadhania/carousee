@@ -379,10 +379,10 @@ def draw_speech_bubble(
 
 # ── Layout: split (group of scientists) ──────────────────────────────────────
 
-def layout_split(slide: dict, fonts: dict, cutouts: dict) -> Image.Image:
+def layout_split(slide: dict, fonts: dict, cutouts: dict, placement: dict = None) -> Image.Image:
     """
-    Left group — characters as equal ensemble.
-    Right single character — dominant if present.
+    Group of characters. Heading/subheading at top. LLM-driven placement when available.
+    Falls back to equal-slot layout when placement is not provided.
     """
     canvas = Image.new("RGBA", (W, H), BG_COLOR)
     _draw_journal_bg(canvas)
@@ -396,60 +396,80 @@ def layout_split(slide: dict, fonts: dict, cutouts: dict) -> Image.Image:
         CharacterCard(c["name"], cutouts.get(c["name"]), c.get("quote"))
         for c in slide.get("right", [])
     ]
-
+    all_chars = left_chars + right_chars
     n = len(left_chars)
-    FLOOR = H + 40
     has_right = bool(right_chars)
 
+    # ── Heading / subheading ───────────────────────────────────────────────────
+    heading = slide.get("heading", "")
+    subheading = slide.get("subheading", "")
+    text_y = MARGIN
+    if heading:
+        h_lines = _wrap_text(heading, fonts["title"], W - 2 * MARGIN)
+        lh = _line_height(fonts["title"])
+        for line in h_lines:
+            draw.text((MARGIN, text_y), line, font=fonts["title"], fill=BODY_COLOR)
+            text_y += lh + 8
+    if subheading:
+        draw.text((MARGIN, text_y + 4), subheading, font=fonts["regular"], fill="#888888")
+
+    # ── Place characters ───────────────────────────────────────────────────────
+    def _place_char(char: CharacterCard, fallback_cx: int, fallback_h: int, fallback_floor: int, fallback_angle: float):
+        p = (placement or {}).get(char.name, {})
+        if p:
+            cx     = int(p["x"] * W)
+            foot_y = int(p["y"] * H)
+            fig_h  = int(p["scale"] * H)
+            angle  = float(p.get("rotation", 0))
+        else:
+            cx     = fallback_cx
+            foot_y = fallback_floor
+            fig_h  = fallback_h
+            angle  = fallback_angle
+
+        face_cx, face_y = cx, H // 4
+        if char.cutout:
+            img = _scale_to_height(char.cutout, fig_h)
+            img = _rotate_cutout(img, angle)
+            px = cx - img.width // 2
+            py = foot_y - img.height
+            _paste_with_shadow(canvas, img, (px, py))
+            draw2 = ImageDraw.Draw(canvas)
+            face_cx = px + img.width // 2
+            face_y  = py + int(img.height * 0.18)
+            return face_cx, face_y, draw2
+        return face_cx, face_y, ImageDraw.Draw(canvas)
+
     if not has_right:
-        # ── 3-column bottom-aligned layout — no overlap ─────────────────────
-        # ── Header text ───────────────────────────────────────────────────────
-        draw.text((MARGIN, MARGIN), "earth is floating in ether",
-                  font=fonts["title"], fill=BODY_COLOR)
-        title_h = _line_height(fonts["title"])
-        draw.text((MARGIN, MARGIN + title_h + 8), "everyone thought. some even had equation for it.",
-                  font=fonts["regular"], fill="#888888")
-
-        # Divide canvas into equal slots; scale each figure to fit its slot.
         slot_count = min(n, 3)
-        slot_w = (W - 2 * MARGIN) // slot_count
-        FLOOR = H - 30  # all feet at this y
+        slot_w = (W - 2 * MARGIN) // max(slot_count, 1)
+        FLOOR = H - 30
         bubble_sides = ["right", "right", "left"]
-
-        # Stagger bubble anchor y so adjacent bubbles don't collide:
-        # left & right go high, center sits a bit lower
         bubble_anchor_y_fracs = [0.47, 0.57, 0.47]
 
         for i, char in enumerate(left_chars[:slot_count]):
             rng = _rng(char.name)
-            slot_left = MARGIN + i * slot_w
-            slot_cx   = slot_left + slot_w // 2
+            slot_cx = MARGIN + i * slot_w + slot_w // 2
+            cw, ch = char.cutout.size if char.cutout else (1, 1)
+            max_w = slot_w - 24
+            fallback_h = int(min(max_w / cw, 820 / ch) * ch) if char.cutout else 600
+            fallback_angle = rng.uniform(-6, 6)
 
-            if char.cutout:
-                # Scale so width fits inside slot (no overlap guarantee)
-                max_w = slot_w - 24
-                cw, ch = char.cutout.size
-                scale  = min(max_w / cw, 820 / ch)
-                img_w  = int(cw * scale)
-                img_h  = int(ch * scale)
-                img = char.cutout.resize((img_w, img_h), Image.LANCZOS)
-                angle = rng.uniform(-6, 6)
-                img = _rotate_cutout(img, angle)
-
-                px = slot_cx - img.width // 2
-                py = FLOOR - img.height
-                _paste_with_shadow(canvas, img, (px, py))
-                draw = ImageDraw.Draw(canvas)
-                face_cx = px + img.width // 2
-            else:
-                face_cx = slot_cx
-
-            # Bubble anchored at a fixed staggered y in the upper portion of canvas
-            anchor_y = int(H * bubble_anchor_y_fracs[i])
+            face_cx, face_y, draw = _place_char(
+                char, slot_cx, fallback_h, FLOOR, fallback_angle
+            )
 
             if char.quote:
-                bside = bubble_sides[i] if i < len(bubble_sides) else "right"
-                kw = dict(anchor_xy=(face_cx, anchor_y), side=bside,
+                cp = (placement or {}).get(char.name, {})
+                if cp.get("bubble_x") is not None:
+                    anchor_x = int(cp["bubble_x"] * W)
+                    anchor_y = int(cp["bubble_y"] * H)
+                    bside    = cp.get("bubble_side", "left" if anchor_x > W // 2 else "right")
+                else:
+                    bside    = bubble_sides[i] if i < len(bubble_sides) else "right"
+                    anchor_x = face_cx
+                    anchor_y = int(H * bubble_anchor_y_fracs[i])
+                kw = dict(anchor_xy=(anchor_x, anchor_y), side=bside,
                           max_width=slot_w - 10, above=True)
                 bbox = draw_speech_bubble(draw, char.quote, fonts["small"], **kw, dry_run=True)
                 _tape_over_bubble(canvas, bbox, rng)
@@ -457,32 +477,26 @@ def layout_split(slide: dict, fonts: dict, cutouts: dict) -> Image.Image:
                 draw_speech_bubble(draw, char.quote, fonts["small"], **kw)
 
     else:
-        # ── Standard split layout (left group + right dominant) ───────────
+        # Old split schema: left group + right dominant character
         slot_w = (W // 2 - 20 - MARGIN // 2) // max(n, 1)
-        base_h = 340
 
         for i, char in enumerate(left_chars):
             rng = _rng(char.name)
-            fig_h = base_h + rng.randint(-60, 80)
-            floor_offset = rng.randint(0, 80)
-            foot_y = FLOOR - floor_offset
+            fallback_h = 340 + rng.randint(-60, 80)
+            fallback_floor = H + 40 - rng.randint(0, 80)
             slot_cx = MARGIN // 2 + i * slot_w + slot_w // 2
 
-            if char.cutout:
-                img = _scale_to_height(char.cutout, fig_h)
-                angle = rng.uniform(-5, 5)
-                img = _rotate_cutout(img, angle)
-                px = slot_cx - img.width // 2
-                py = foot_y - img.height
-                _paste_with_shadow(canvas, img, (px, py))
-                face_y  = py + int(img.height * 0.20)
-                face_cx = px + img.width // 2
-            else:
-                face_y  = foot_y - fig_h + 80
-                face_cx = slot_cx
-
+            face_cx, face_y, draw = _place_char(
+                char, slot_cx, fallback_h, fallback_floor, rng.uniform(-5, 5)
+            )
             if char.quote:
-                bside = "right" if i % 2 == 0 else "left"
+                cp = (placement or {}).get(char.name, {})
+                if cp.get("bubble_x") is not None:
+                    bside    = cp.get("bubble_side", "right")
+                    face_cx  = int(cp["bubble_x"] * W)
+                    face_y   = int(cp["bubble_y"] * H)
+                else:
+                    bside = "right" if i % 2 == 0 else "left"
                 draw_speech_bubble(
                     draw, char.quote, fonts["small"],
                     anchor_xy=(face_cx, face_y),
@@ -491,27 +505,15 @@ def layout_split(slide: dict, fonts: dict, cutouts: dict) -> Image.Image:
                     above=True,
                 )
 
-    # Right character: large, dominant
-    if has_right:
-        RIGHT_X0 = W // 2 + 10
         char = right_chars[0]
         rng = _rng(char.name + "_right")
-        fig_h = 760 + rng.randint(-30, 50)
-
-        if char.cutout:
-            img = _scale_to_height(char.cutout, fig_h)
-            angle = rng.uniform(-5, 5)
-            img = _rotate_cutout(img, angle)
-            right_cx = RIGHT_X0 + (W - RIGHT_X0) // 2 + rng.randint(-40, 40)
-            px = max(RIGHT_X0 - 20, right_cx - img.width // 2)
-            py = FLOOR - img.height
-            _paste_with_shadow(canvas, img, (px, py))
-            face_y = py + int(img.height * 0.14)
-            face_cx = px + img.width // 2
-        else:
-            face_y = H // 4
-            face_cx = RIGHT_X0 + (W - RIGHT_X0) // 2
-
+        face_cx, face_y, draw = _place_char(
+            char,
+            fallback_cx=W // 2 + 10 + (W - W // 2) // 2 + rng.randint(-40, 40),
+            fallback_h=760 + rng.randint(-30, 50),
+            fallback_floor=H + 40,
+            fallback_angle=rng.uniform(-5, 5),
+        )
         if char.quote:
             bub_side = "left" if face_cx > W * 0.6 else "right"
             draw_speech_bubble(
@@ -522,16 +524,47 @@ def layout_split(slide: dict, fonts: dict, cutouts: dict) -> Image.Image:
                 above=True,
             )
 
+    # ── Objects ────────────────────────────────────────────────────────────────
+    obj_quotes = slide.get("object_quotes", {})
+    for obj_name in slide.get("objects", []):
+        obj_cutout = cutouts.get(obj_name)
+        if not obj_cutout:
+            continue
+        op = (placement or {}).get(obj_name, {})
+        obj_rng = _rng(obj_name)
+        obj_cx    = int(op["x"] * W)     if op else int(W * obj_rng.uniform(0.2, 0.8))
+        obj_foot  = int(op["y"] * H)     if op else int(H * 0.82)
+        obj_h     = int(op["scale"] * H) if op else int(H * 0.22)
+        obj_angle = float(op.get("rotation", 0)) if op else obj_rng.uniform(-15, 15)
+        obj_img = _scale_to_height(obj_cutout, obj_h)
+        obj_img = _rotate_cutout(obj_img, obj_angle)
+        _paste_with_shadow(canvas, obj_img, (obj_cx - obj_img.width // 2, obj_foot - obj_img.height))
+        draw = ImageDraw.Draw(canvas)
+        obj_quote = obj_quotes.get(obj_name)
+        if obj_quote:
+            if op.get("bubble_x") is not None:
+                ob_ax = int(op["bubble_x"] * W)
+                ob_ay = int(op["bubble_y"] * H)
+                ob_side = op.get("bubble_side", "left" if ob_ax > W // 2 else "right")
+            else:
+                ob_ay = obj_foot - int(obj_h * 0.5)
+                ob_ax = obj_cx
+                ob_side = "left" if obj_cx > W // 2 else "right"
+            draw_speech_bubble(draw, obj_quote, fonts["small"],
+                               anchor_xy=(ob_ax, ob_ay),
+                               side=ob_side, max_width=320, above=True)
+
     _draw_slide_counter(draw, fonts, slide)
     return canvas.convert("RGBA")
 
 
 # ── Layout: solo ──────────────────────────────────────────────────────────────
 
-def layout_solo(slide: dict, fonts: dict, cutouts: dict) -> Image.Image:
+def layout_solo(slide: dict, fonts: dict, cutouts: dict, placement: dict = None) -> Image.Image:
     """
     Single character. Large. Pushed left or right — never centered.
     Quote bubble commands the negative space on the other side.
+    Accepts optional LLM-provided placement; falls back to rng-based positioning.
     """
     canvas = Image.new("RGBA", (W, H), BG_COLOR)
     _draw_journal_bg(canvas)
@@ -539,48 +572,93 @@ def layout_solo(slide: dict, fonts: dict, cutouts: dict) -> Image.Image:
 
     name = slide.get("character", "")
     quote = slide.get("quote", "")
+    heading = slide.get("heading", "")
     cutout = cutouts.get(name)
-    # Seed with slide id so same character looks different across slides
     rng = _rng(name + str(slide.get("id", "")))
 
-    FLOOR = H + 40
-    fig_h = 900 + rng.randint(-40, 60)
+    # Optional heading above the portrait
+    text_y = MARGIN
+    if heading:
+        h_lines = _wrap_text(heading, fonts["regular"], W - 2 * MARGIN)
+        lh = _line_height(fonts["regular"])
+        for line in h_lines:
+            draw.text((MARGIN, text_y), line, font=fonts["regular"], fill="#888888")
+            text_y += lh + 6
 
-    # Odd slide ids push right, even push left — ensures visual contrast
-    slide_id = slide.get("id", 1)
-    if slide_id % 2 == 0:
-        cx = int(W * rng.uniform(0.30, 0.45))   # left-leaning
+    # ── Position from LLM placement or rng fallback ────────────────────────────
+    p = (placement or {}).get(name, {})
+    if p:
+        cx     = int(p["x"] * W)
+        foot_y = int(p["y"] * H)
+        fig_h  = int(p["scale"] * H)
+        angle  = float(p.get("rotation", 0))
     else:
-        cx = int(W * rng.uniform(0.52, 0.65))   # right-leaning
+        slide_id = slide.get("id", 1)
+        fig_h  = 900 + rng.randint(-40, 60)
+        foot_y = H + 40
+        cx     = int(W * (rng.uniform(0.52, 0.65) if slide_id % 2 == 1 else rng.uniform(0.30, 0.45)))
+        angle  = rng.uniform(-12, 12)
 
     if cutout:
         img = _scale_to_height(cutout, fig_h)
-        angle = rng.uniform(-12, 12)
         img = _rotate_cutout(img, angle)
         px = cx - img.width // 2
-        py = FLOOR - img.height
+        py = foot_y - img.height
         _paste_with_shadow(canvas, img, (px, py))
-        # Deal With It glasses on slide 2
         draw = ImageDraw.Draw(canvas)
-        face_y = py + int(img.height * 0.12)
+        face_y  = py + int(img.height * 0.12)
         face_cx = px + img.width // 2
     else:
-        face_y = H // 5
+        face_y  = H // 5
         face_cx = cx
 
-    if quote:
-        # Choose font based on quote length
-        q_font = fonts["large"] if len(quote) < 60 else fonts["medium"]
-        # Bubble always on the side with more negative space
-        if face_cx < W // 2:
-            bside = "right"
-            anchor_x = face_cx + rng.randint(10, 40)
-        else:
-            bside = "left"
-            anchor_x = face_cx - rng.randint(10, 40)
+    # ── Objects ────────────────────────────────────────────────────────────────
+    obj_quotes = slide.get("object_quotes", {})
+    for obj_name in slide.get("objects", []):
+        obj_cutout = cutouts.get(obj_name)
+        if not obj_cutout:
+            continue
+        op = (placement or {}).get(obj_name, {})
+        obj_rng = _rng(obj_name)
+        obj_cx    = int(op["x"] * W)     if op else int(W * obj_rng.uniform(0.2, 0.8))
+        obj_foot  = int(op["y"] * H)     if op else int(H * 0.82)
+        obj_h     = int(op["scale"] * H) if op else int(H * 0.22)
+        obj_angle = float(op.get("rotation", 0)) if op else obj_rng.uniform(-15, 15)
+        obj_img = _scale_to_height(obj_cutout, obj_h)
+        obj_img = _rotate_cutout(obj_img, obj_angle)
+        _paste_with_shadow(canvas, obj_img, (obj_cx - obj_img.width // 2, obj_foot - obj_img.height))
+        draw = ImageDraw.Draw(canvas)
+        obj_quote = obj_quotes.get(obj_name)
+        if obj_quote:
+            if op.get("bubble_x") is not None:
+                ob_ax = int(op["bubble_x"] * W)
+                ob_ay = int(op["bubble_y"] * H)
+                ob_side = op.get("bubble_side", "left" if ob_ax > W // 2 else "right")
+            else:
+                ob_ay = obj_foot - int(obj_h * 0.5)
+                ob_ax = obj_cx
+                ob_side = "left" if obj_cx > W // 2 else "right"
+            draw_speech_bubble(draw, obj_quote, fonts["small"],
+                               anchor_xy=(ob_ax, ob_ay),
+                               side=ob_side, max_width=320, above=True)
 
-        kw = dict(anchor_xy=(anchor_x, face_y + rng.randint(0, 40)),
-                  side=bside, max_width=580, above=True)
+    # ── Speech bubble ──────────────────────────────────────────────────────────
+    if quote:
+        q_font = fonts["large"] if len(quote) < 60 else fonts["medium"]
+        if p.get("bubble_x") is not None:
+            anchor_x = int(p["bubble_x"] * W)
+            anchor_y = int(p["bubble_y"] * H)
+            bside    = p.get("bubble_side", "left" if anchor_x > W // 2 else "right")
+        else:
+            if face_cx < W // 2:
+                bside = "right"
+                anchor_x = face_cx + rng.randint(10, 40)
+            else:
+                bside = "left"
+                anchor_x = face_cx - rng.randint(10, 40)
+            anchor_y = face_y + rng.randint(0, 40)
+
+        kw = dict(anchor_xy=(anchor_x, anchor_y), side=bside, max_width=580, above=True)
         bbox = draw_speech_bubble(draw, quote, q_font, **kw, dry_run=True)
         _tape_over_bubble(canvas, bbox, rng)
         draw = ImageDraw.Draw(canvas)
