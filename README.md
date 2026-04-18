@@ -149,3 +149,7 @@ output/
   slide_002.png
   ...
 ```
+
+<img src='./slide_001.png'>
+<img src='./slide_002.png'>
+<img src='./slide_003.png'>
