@@ -83,8 +83,16 @@ def search_object(name: str) -> str | None:
         return None
 
 
-def download_object(name: str, cache_dir: Path, force: bool = False) -> Path:
-    """Download an object image from Wikimedia Commons."""
+def download_object(name: str, cache_dir: Path, force: bool = False, custom_dir: Path | None = None) -> Path:
+    """Download an object image from Wikimedia Commons, or use a custom image if name is a filename."""
+    # If name looks like a filename (has extension), use custom dir
+    if custom_dir and Path(name).suffix.lower() in (".jpg", ".jpeg", ".png", ".webp"):
+        custom_path = custom_dir / name
+        if custom_path.exists():
+            print(f"  [fetch] Using custom object image: {custom_path}")
+            return custom_path
+        raise FileNotFoundError(f"Custom object image not found: {custom_path}")
+
     cache_dir.mkdir(parents=True, exist_ok=True)
     slug = "obj_" + _slug(name)
 
@@ -112,7 +120,21 @@ def download_object(name: str, cache_dir: Path, force: bool = False) -> Path:
     return out_path
 
 
-def download_portrait(name: str, cache_dir: Path, force: bool = False) -> Path:
+def download_portrait(
+    name: str,
+    cache_dir: Path,
+    force: bool = False,
+    custom_image: str | None = None,
+    custom_dir: Path | None = None,
+) -> Path:
+    # Use custom image if specified
+    if custom_image and custom_dir:
+        custom_path = custom_dir / custom_image
+        if custom_path.exists():
+            print(f"  [fetch] Using custom image: {custom_path}")
+            return custom_path
+        raise FileNotFoundError(f"Custom image not found: {custom_path}")
+
     cache_dir.mkdir(parents=True, exist_ok=True)
     slug = _slug(name)
 

@@ -13,6 +13,14 @@ from carousee.placer import get_placement
 from carousee.segmenter import remove_background, warm_up
 from carousee.fonts import ensure_fonts
 
+_custom_dir: Path | None = None
+
+
+def set_custom_dir(path: str | Path) -> None:
+    """Set the directory where user-supplied images are stored."""
+    global _custom_dir
+    _custom_dir = Path(path)
+
 
 def _default_dirs() -> tuple[Path, Path, Path, Path]:
     base = Path.home() / ".carousee"
@@ -47,17 +55,37 @@ def collect_object_names(yaml_data: dict) -> list[str]:
     return list(objects)
 
 
+def collect_image_overrides(yaml_data: dict) -> dict[str, str]:
+    """Return {person_name: custom_image_filename} for slides with an explicit image field."""
+    overrides = {}
+    for slide in yaml_data.get("slides", []):
+        if slide.get("image"):
+            name = slide.get("name") or slide.get("character")
+            if name:
+                overrides[name] = slide["image"]
+        for person in slide.get("people", []):
+            if person.get("image") and person.get("name"):
+                overrides[person["name"]] = person["image"]
+    return overrides
+
+
 def prefetch_cutouts(
     names: list[str],
     object_names: list[str],
     image_dir: Path,
     cutout_dir: Path,
     skip_cache: bool = False,
+    image_overrides: dict[str, str] | None = None,
 ) -> dict[str, Image.Image]:
+    image_overrides = image_overrides or {}
     cutouts = {}
     for name in names:
         try:
-            img_path = download_portrait(name, image_dir, force=skip_cache)
+            img_path = download_portrait(
+                name, image_dir, force=skip_cache,
+                custom_image=image_overrides.get(name),
+                custom_dir=_custom_dir,
+            )
             cutout_path = remove_background(img_path, cutout_dir, force=skip_cache)
             cutouts[name] = Image.open(cutout_path).convert("RGBA")
         except Exception as e:
@@ -65,7 +93,7 @@ def prefetch_cutouts(
             cutouts[name] = None
     for obj in object_names:
         try:
-            img_path = download_object(obj, image_dir, force=skip_cache)
+            img_path = download_object(obj, image_dir, force=skip_cache, custom_dir=_custom_dir)
             cutout_path = remove_background(img_path, cutout_dir, force=skip_cache)
             cutouts[obj] = Image.open(cutout_path).convert("RGBA")
         except Exception as e:
@@ -136,10 +164,13 @@ def compose_all(
 
     names = collect_names(yaml_data)
     object_names = collect_object_names(yaml_data)
+    image_overrides = collect_image_overrides(yaml_data)
     print(f"[carousee] Characters: {names}")
     if object_names:
         print(f"[carousee] Objects: {object_names}")
-    cutouts = prefetch_cutouts(names, object_names, image_dir, cutout_dir, skip_cache)
+    if image_overrides:
+        print(f"[carousee] Custom images: {image_overrides}")
+    cutouts = prefetch_cutouts(names, object_names, image_dir, cutout_dir, skip_cache, image_overrides)
 
     fonts = layouts.load_fonts(font_dir)
     paths = []
