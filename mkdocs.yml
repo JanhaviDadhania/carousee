@@ -1,0 +1,20 @@
+site_name: carousee
+site_description: Generate Instagram/LinkedIn carousel slides from a plain text script
+site_url: https://carousee.readthedocs.io
+repo_url: https://github.com/JanhaviDadhania/carousee
+repo_name: JanhaviDadhania/carousee
+
+theme:
+  name: material
+  palette:
+    primary: indigo
+    accent: indigo
+  features:
+    - content.code.copy
+
+markdown_extensions:
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+nav:
+  - Home: index.md
