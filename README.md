@@ -139,6 +139,10 @@ NAME_OVERRIDES = {
 
 ---
 
+
+## documentation 
+[doc](https://carousee.readthedocs.io/en/latest/)
+
 ## Output
 
 Slides are saved as 1080×1080 PNG files in the output directory:
