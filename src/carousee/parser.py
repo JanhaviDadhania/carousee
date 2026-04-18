@@ -25,8 +25,9 @@ slides:
     name: <str>
     quote: <str>
     heading: <str>        # optional label above the photo
+    image: <str>          # optional custom image filename (e.g. "einstein.jpg") — overrides internet search
     objects:              # optional list of prop/object images to place on the slide
-      - <str>             # object name (e.g. "apple", "telescope", "prism")
+      - <str>             # object name (e.g. "apple") OR custom filename (e.g. "my_apple.jpg") — filename if it has an extension
     description: <str>   # optional spatial hint for the layout engine, e.g.
                           # "apple falling on Newton's head from top-right"
 
@@ -36,6 +37,7 @@ slides:
     people:
       - name: <str>
         quote: <str>
+        image: <str>      # optional custom image filename for this person
     objects:              # optional — same as person
       - <str>
     description: <str>   # optional spatial hint
